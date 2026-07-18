@@ -158,6 +158,25 @@ def call_bridge_tool(name, arguments):
         return json.loads(resp.read().decode("utf-8"))
 
 
+def robot_online_status():
+    """查询桥接 /health，评估机器人最近是否和电脑连线。返回状态说明文本。"""
+    try:
+        with urllib.request.urlopen(BRIDGE_HTTP + "/health", timeout=5) as resp:
+            h = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return "⚠️ 电脑上的桥接服务没响应，留言已存在队列文件里，但要等桥接起来、机器人连线后才会送达。"
+    idle = h.get("mcp_idle_seconds")
+    pending = h.get("pending_inbox") or 0
+    extra = f"（队列里现有 {pending} 条留言）" if pending > 1 else ""
+    if idle is None:
+        return f"📥 已排队{extra}。机器人这次开机后还没连过电脑，等它回到 AI 模式、下次对话调用工具时才会收到并播报。"
+    if idle < 120:
+        return f"📥 已排队{extra}。机器人刚和电脑连线过（{idle} 秒前），下次它调用工具时（比如你喊它问时间/看屏幕）就会先播报这条。"
+    if idle < 3600:
+        return f"📥 已排队{extra}。机器人已有 {idle // 60} 分钟没和电脑连线了，等它下次对话时才会收到。"
+    return f"📥 已排队{extra}。机器人已有 {idle // 3600} 小时没和电脑连线了，等它回到 AI 模式、下次对话时才会收到。"
+
+
 # ---------------------------------------------------------------- K3 指令解析
 
 MAPPER_PROMPT = """你是飞书遥控指令解析器。主人在飞书里发消息，遥控一台 Windows 电脑（桌上 StackChan 机器人的桥接电脑）。
@@ -244,7 +263,8 @@ def handle_user_text(user_text):
             with open(ROBOT_INBOX, "a", encoding="utf-8") as f:
                 f.write(json.dumps({"ts": time.time(), "instruction": instruction}, ensure_ascii=False) + "\n")
             log.info("飞书指令已入队给机器人: %s", instruction)
-            return [("text", f"已转达给机器人：{instruction}\n（它无法被远程唤醒，下次你喊它说话时会先播报/照做这条指令）")]
+            status = robot_online_status()
+            return [("text", f"已转达给机器人：{instruction}\n{status}")]
         except Exception as e:
             return [("text", f"写入机器人指令队列失败：{e}")]
 

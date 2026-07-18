@@ -40,6 +40,25 @@ CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
 LOG_PATH = os.path.join(BASE_DIR, "bridge.log")
 ROBOT_INBOX = os.path.join(BASE_DIR, "robot_inbox.jsonl")
 
+# 机器人最近一次通过 MCP 连上桥接的时间戳（0 表示从未连接）。
+# 飞书回执用它判断"留言大概要等多久才会被机器人收到"。
+LAST_MCP_ACTIVITY = 0.0
+
+
+def touch_mcp_activity():
+    global LAST_MCP_ACTIVITY
+    LAST_MCP_ACTIVITY = time.time()
+
+
+def pending_inbox_count():
+    if not os.path.exists(ROBOT_INBOX):
+        return 0
+    try:
+        with open(ROBOT_INBOX, encoding="utf-8") as f:
+            return sum(1 for line in f if line.strip())
+    except Exception:
+        return 0
+
 
 def drain_robot_inbox():
     """取出主人从飞书留给机器人的指令（若有），返回提示前缀文本。
@@ -492,7 +511,7 @@ class StdioMcpServer:
         await self._request("initialize", {
             "protocolVersion": "2024-11-05",
             "capabilities": {},
-            "clientInfo": {"name": "stackchan-pc-bridge", "version": "0.6.0"},
+            "clientInfo": {"name": "stackchan-pc-bridge", "version": "0.6.1"},
         })
         await self._notify("notifications/initialized")
         result = await self._request("tools/list", {})
@@ -677,7 +696,16 @@ class _LocalHttpHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            self._send(200, {"ok": True, "tools": len(all_tools())})
+            idle = None
+            if LAST_MCP_ACTIVITY:
+                idle = int(time.time() - LAST_MCP_ACTIVITY)
+            self._send(200, {
+                "ok": True,
+                "tools": len(all_tools()),
+                "last_mcp_activity": LAST_MCP_ACTIVITY or None,
+                "mcp_idle_seconds": idle,
+                "pending_inbox": pending_inbox_count(),
+            })
         elif self.path == "/tools":
             self._send(200, {"tools": all_tools()})
         else:
@@ -725,6 +753,7 @@ def make_error(req_id, code, message):
 
 async def handle_request(msg):
     """处理一个 JSON-RPC 请求，返回需要发回的 JSON 字符串或 None。"""
+    touch_mcp_activity()
     method = msg.get("method", "")
     req_id = msg.get("id")
     params = msg.get("params") or {}
@@ -739,7 +768,7 @@ async def handle_request(msg):
         return make_result(req_id, {
             "protocolVersion": client_version,
             "capabilities": {"tools": {"listChanged": False}},
-            "serverInfo": {"name": "stackchan-pc-bridge", "version": "0.6.0"},
+            "serverInfo": {"name": "stackchan-pc-bridge", "version": "0.6.1"},
         })
 
     if method == "ping":

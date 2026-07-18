@@ -64,6 +64,7 @@ Avatar 分身、监控摄像头、Motion 遥控、Dance 跳舞编排、对话记
 ### 飞书遥控（feishu_listener.py，飞书里发消息即可）
 对飞书机器人「**飞书 CLI**」私聊发文字即可遥控：自然语言 → Kimi K3 解析（只翻译参数，不生成代码）→ 调用全部 28 个技能 → 文字/截图回复。例："打开电脑上的B站"、"截个屏"。闲聊也可，由 K3 直接回答。仅白名单用户（主人）可用。
 **指挥机器人说话/提醒**：说"让机器人 xxx"（非动作类）→ 指令进 `robot_inbox.jsonl` 队列 → 机器人下次被唤醒对话时先播报/照做再回应你。⚠️ 两个前提：①官方固件下机器人无法被远程主动唤醒；②**那次对话必须触发一次工具调用**（问时间、开网页等都算），纯闲聊不消耗队列。
+**状态回执**（v0.6.1 起）：说话类指令入队后，飞书会立刻回你一条机器人连线状态——"刚连线过（N 秒前）/ 已 N 分钟没连线 / 桥接没响应"，不用猜留言何时送达。原理：bridge 记录机器人最近一次 MCP 消息时间，`/health` 返回 `mcp_idle_seconds` 和 `pending_inbox`（队列条数）。
 
 ### 蓝牙直控机器人（robot_ble.py，Dance 模式下立即执行）
 机器人在 **Dance 跳舞模式**下开放无配对 BLE GATT 服务（固件源码实锤），电脑经 `robot.head_move` / `robot.rgb_light` 工具**蓝牙直连立即控制**，飞书说"让机器人左转 30 度/亮红灯"立即生效；本机 CLI：`python robot_ble.py scan / move --yaw --pitch / rgb / demo`。⚠️ AI Agent 模式下 BLE 服务关闭，会提示"没找到蓝牙信号"。
@@ -72,7 +73,7 @@ Avatar 分身、监控摄像头、Motion 遥控、Dance 跳舞编排、对话记
 
 | 内容 | 路径 |
 |---|---|
-| 桥接主程序 | `stackchan-mcp\bridge.py`（v0.6.0，含本地 HTTP 端点 `127.0.0.1:8766`）|
+| 桥接主程序 | `stackchan-mcp\bridge.py`（v0.6.1，含本地 HTTP 端点 `127.0.0.1:8766`）|
 | 飞书监听 | `stackchan-mcp\feishu_listener.py`（飞书 CLI 机器人，App ID `cli_a944219ac1b9dcd6`）|
 | 蓝牙控制模块 | `stackchan-mcp\robot_ble.py`（被 bridge.py 引用，也可独立运行）|
 | 机器人指令队列 | `stackchan-mcp\robot_inbox.jsonl`（飞书→机器人留言，消费后自动清空）|
