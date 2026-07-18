@@ -249,6 +249,11 @@ TOOLS = [
     },
 ]
 
+# 机器人本体直控工具：仅对本机 HTTP 端点（飞书遥控等）开放，
+# 不下发给机器人智能体——动作类请求应让机器人用固件自身能力完成，
+# 避免它动不动就调 MCP 绕回电脑。
+ROBOT_DIRECT_TOOLS = {"robot.head_move", "robot.rgb_light"}
+
 
 def tool_open_url(args):
     url = (args.get("url") or "").strip()
@@ -511,7 +516,7 @@ class StdioMcpServer:
         await self._request("initialize", {
             "protocolVersion": "2024-11-05",
             "capabilities": {},
-            "clientInfo": {"name": "stackchan-pc-bridge", "version": "0.6.1"},
+            "clientInfo": {"name": "stackchan-pc-bridge", "version": "0.6.2"},
         })
         await self._notify("notifications/initialized")
         result = await self._request("tools/list", {})
@@ -768,21 +773,27 @@ async def handle_request(msg):
         return make_result(req_id, {
             "protocolVersion": client_version,
             "capabilities": {"tools": {"listChanged": False}},
-            "serverInfo": {"name": "stackchan-pc-bridge", "version": "0.6.1"},
+            "serverInfo": {"name": "stackchan-pc-bridge", "version": "0.6.2"},
         })
 
     if method == "ping":
         return make_result(req_id, {})
 
     if method == "tools/list":
-        tools = all_tools()
-        log.info("MCP tools/list，返回 %d 个工具", len(tools))
+        # 机器人本体直控工具不下发：动作让机器人用固件自身能力完成
+        tools = [t for t in all_tools() if t.get("name") not in ROBOT_DIRECT_TOOLS]
+        log.info("MCP tools/list，返回 %d 个工具（已屏蔽机器人直控类）", len(tools))
         return make_result(req_id, {"tools": tools})
 
     if method == "tools/call":
         name = params.get("name", "")
         arguments = params.get("arguments") or {}
         log.info("MCP tools/call: %s 参数: %s", name, json.dumps(arguments, ensure_ascii=False))
+        if name in ROBOT_DIRECT_TOOLS:
+            return make_result(req_id, {
+                "content": [{"type": "text", "text": "这个动作请用你自己的能力完成（转头、俯仰、灯光都是你的固件自带的），不需要调用电脑。"}],
+                "isError": True,
+            })
         handler = HANDLERS.get(name)
         if not handler:
             return make_error(req_id, -32602, f"未知工具: {name}")
