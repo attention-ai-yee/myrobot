@@ -2,6 +2,7 @@
 
 > 建立时间：2026-07-18 凌晨 · 由 Kimi 与主人共同搭建
 > 一句话：一台 M5Stack StackChan 机器人 + 这台电脑 + 飞书 = 会聊天、会动、会看、能控电脑、能被飞书远程操控、拥有 Kimi K3 专家大脑的桌面 AI 伙伴。
+> **协作约定**：代码/档案每次改动后立即 commit 并 push 到 [GitHub: attention-ai-yee/myrobot](https://github.com/attention-ai-yee/myrobot)，保持远程同步。
 
 ---
 
