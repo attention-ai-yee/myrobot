@@ -121,8 +121,38 @@ Avatar 分身、监控摄像头、Motion 遥控、Dance 跳舞编排、对话记
 - 调 K3 回答风格：`config.json` 的 expert_model（思考强度 low/high/max、字数）
 - 挂更多公共 MCP 套件：`config.json` 的 mcp_servers 加一段即可
 - 蓝牙控制更多：表情（Avatar 特征 `e2e5e5e2`）、舞蹈序列——`robot_ble.py` 里加几个函数的事
-- 终极自定义：改开源固件在 AI Agent 模式常驻 BLE/HTTP 控制服务 + TTS 注入（仓库 m5stack/StackChan 全开源：firmware/app/server/remote），或自建 xiaozhi-esp32-server——能实现"随时主动开口"，代价是失去 M5Stack app 功能
+- 终极自定义：改开源固件在 AI Agent 模式常驻 BLE/HTTP 控制服务 + TTS 注入（仓库 m5stack/StackChan 全开源：firmware/app/server/remote），或自建 xiaozhi-esp32-server——能实现"随时主动开口"，代价是失去 M5Stack app 功能（详细调研见文末附录）
 - 关闭待机转头：官方暂无开关（GitHub 有 open 的 Feature Request），可改开源固件实现
+
+## 附录：固件 / 服务端控制通道调研（2026-07-18）
+
+**为什么官方固件下无法"随时让机器人开口"**：四条远程控制通道（BLE、WS-Avatar、ESP-NOW、EzData）全部只在各自 mooncake 应用前台存活；AI Agent 模式不开放任何推送通道；小智云没有 push API。唯一能把话送进机器人智能体的钩子是 MCP 工具调用结果——这就是飞书队列注入的原理，也是延迟的根源。
+
+**固件源码结构**（工作区 `tree.json` 有全量文件树）：
+
+| 路径 | 内容 |
+|---|---|
+| `firmware/` | 完整 ESP-IDF 工程（CMakeLists、Kconfig.projbuild、fetch_repos.py），mooncake 应用框架 |
+| `main/apps/app_ai_agent/` | AI 对话模式（想加常驻服务就改这里）|
+| `main/apps/app_dance/` | Dance 模式（BLE GATT 服务在这开）|
+| `main/apps/app_avatar/` | WS 视频通话 |
+| `main/apps/app_espnow_ctrl/` | ESP-NOW 遥控 |
+
+**路线 A：改固件**——在 `app_ai_agent` 里加常驻 BLE/HTTP 控制服务，收到文本调 TTS 开口；飞书指令秒达、BLE 两模式常驻、顺手能修 #103。成本：ESP-IDF 环境 + C++ 改动，约一个晚上；可逆（M5Burner 随时刷回官方固件，刷不砖）。
+
+**路线 B：自建小智后端**（xinnan-tech/xiaozhi-esp32-server，GitHub 官方文档数据）：
+
+| 部署形态 | 本地 FunASR 识别 | 全 API（含云端识别）|
+|---|---|---|
+| 最简化安装（单智能体，无数据库）| 2 核 4 G | **2 核 2 G** |
+| 全模块安装（智控台 + MySQL/Redis/Java）| 4 核 8 G | 2 核 4 G |
+
+- 全免费组件方案：LLM glm-4-flash（可换 Kimi，OpenAI 兼容协议）、TTS EdgeTTS、ASR 本地 FunASR；ASR 用云端（讯飞/火山，有免费额度）则内存要求最低
+- 公网部署**必须开 `server.auth` 防护**（官方安全警告，项目未做安全测评）
+- 全模块版额外要 Java（Spring Boot manager-api）+ MySQL + Redis，个人玩建议最简化
+- ⚠️ **未验证的关键项**：StackChan 官方固件的服务器地址（api.xiaozhi.me）是写死还是可在配置里改。能改 → 纯服务器部署一晚上搞定；写死 → 仍需编一次固件改 OTA 地址（menuconfig 级别的小改）
+
+**现有资源**：主人有一台阿里云 2 核 2 G 服务器 = 全 API 最简化方案及格线（ASR 必须走云 API，本地 FunASR 跑不动）。2026-07-18 决定暂缓，需要时直接从本节继续。
 
 ## 八、无线连接方式总览
 
@@ -130,7 +160,7 @@ Avatar 分身、监控摄像头、Motion 遥控、Dance 跳舞编排、对话记
 
 | 方式 | 干什么用 | 怎么用 / 注意 |
 |---|---|---|
-| **Wi-Fi（主力）** | AI 对话、拍照问答、提醒、OTA 升级、app 视频/监控、电脑 MCP 桥接（26 个云侧技能）| 仅 2.4GHz；一切"智能"都走 Wi-Fi → 小智云端 |
+| **Wi-Fi（主力）** | AI 对话、拍照问答、提醒、OTA 升级、app 视频/监控、电脑 MCP 桥接（28 个云侧技能）| 仅 2.4GHz；一切"智能"都走 Wi-Fi → 小智云端 |
 | **蓝牙 BLE 5.0** | ①手机 app 的 Dance 跳舞编排 ②**本电脑 BLE 直控**（robot.head_move / robot.rgb_light）| 服务仅在 Dance 模式开放、无配对；❌不能当蓝牙音箱/耳机；AI Agent 模式关闭 |
 | **ESP-NOW** | 官方遥控器固件专用（乐鑫私有协议，不经路由器）| 普通用户接触不到，DIY 遥控手柄才用 |
 | **USB-C（COM5）** | 供电、刷固件、串口日志（115200）| 插线打开串口会让机器人复位重启，属正常现象 |
