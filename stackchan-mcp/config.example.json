@@ -1,0 +1,29 @@
+{
+  "endpoint": "wss://api.xiaozhi.me/mcp/?token=【从小智APP复制的MCP接入点地址】",
+  "reconnect_min_seconds": 5,
+  "reconnect_max_seconds": 60,
+  "local_http_port": 8766,
+  "expert_model": {
+    "base_url": "https://api.kimi.com/coding/v1",
+    "api_key": "【你的 Kimi API Key】",
+    "model": "k3",
+    "reasoning_effort": "low",
+    "max_completion_tokens": 1024,
+    "timeout_seconds": 90,
+    "system_prompt": "你是专家助手。你的回答会被一个语音机器人朗读出来，所以请直接给结论、控制在 150 字以内、不要使用 markdown 格式，除非用户明确要求详细展开。"
+  },
+  "feishu": {
+    "enabled": true,
+    "app_id": "【飞书应用 App ID】",
+    "app_secret": "【飞书应用 App Secret】",
+    "allowed_open_ids": [],
+    "bridge_http": "http://127.0.0.1:8766"
+  },
+  "mcp_servers": [
+    {
+      "name": "win",
+      "command": ["uv", "tool", "run", "windows-mcp", "serve", "--transport", "stdio"],
+      "allow_tools": ["App", "Snapshot", "Screenshot", "Click", "Type", "Shortcut", "Scroll", "Wait", "Scrape", "Clipboard", "Notification", "PowerShell", "Registry", "Process", "FileSystem"]
+    }
+  ]
+}

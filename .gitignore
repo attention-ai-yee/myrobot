@@ -1,0 +1,21 @@
+# ---- 密钥与个人隐私（绝不上传）----
+config.json
+robot_inbox.jsonl
+robot_inbox.jsonl.*
+issue-103-state.json
+
+# ---- 日志与临时产物 ----
+*.log
+selftest_shot.png
+screen.png
+cursor_check.png
+counter_check.png
+tree.json
+stackchan.zip
+stackchan-src/
+
+# ---- 本地环境与依赖 ----
+.venv/
+bin/
+__pycache__/
+*.pyc
